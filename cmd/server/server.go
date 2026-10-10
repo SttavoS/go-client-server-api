@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 type UsdBrl struct {
@@ -34,8 +36,18 @@ func main() {
 }
 
 func BuscaCotacao(w http.ResponseWriter, r *http.Request) {
-	resp, err := http.Get("https://economia.awesomeapi.com.br/json/last/USD-BRL")
+	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
 	w.Header().Set("Content-Type", "application/json")
+
+	if err != nil {
+		log.Printf("Erro ao criar o contexto: %v", err)
+		writeErrorResponse(w, http.StatusInternalServerError, "Erro ao realizar requisição")
+		return
+	}
+
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		log.Printf("Erro ao chamar a API: %v", err)
 		writeErrorResponse(w, http.StatusBadGateway, "Erro ao realizar requisição")
