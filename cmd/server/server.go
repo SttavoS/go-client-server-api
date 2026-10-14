@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log"
 	"net/http"
@@ -38,17 +39,22 @@ func main() {
 func BuscaCotacao(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 200*time.Millisecond)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://economia.awesomeapi.com.br/json/last/USD-BRL", nil)
 	w.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
-		log.Printf("Erro ao criar o contexto: %v", err)
+		log.Printf("Erro ao criar a requisição com contexto: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Erro ao realizar requisição")
 		return
 	}
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("Timeout na requisição: %v", err)
+			writeErrorResponse(w, http.StatusGatewayTimeout, "Requisição demorou demais")
+			return
+		}
 		log.Printf("Erro ao chamar a API: %v", err)
 		writeErrorResponse(w, http.StatusBadGateway, "Erro ao realizar requisição")
 		return
