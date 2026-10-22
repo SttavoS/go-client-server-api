@@ -90,6 +90,11 @@ func BuscaCotacao(w http.ResponseWriter, r *http.Request) {
 
 	responseBody, err := io.ReadAll(resp.Body)
 	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("Timeout na requisição: %v", err)
+			writeErrorResponse(w, http.StatusGatewayTimeout, "Requisição demorou demais")
+			return
+		}
 		log.Printf("Erro ao ler a resposta: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Erro ao ler a resposta")
 		return
