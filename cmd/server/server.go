@@ -2,12 +2,15 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
 	"log"
 	"net/http"
 	"time"
+
+	_ "modernc.org/sqlite"
 )
 
 type UsdBrl struct {
@@ -31,7 +34,25 @@ type ErrorResponse struct {
 	Message    string `json:"message"`
 }
 
+var db *sql.DB
+
 func main() {
+	var err error
+	db, err = sql.Open("sqlite", "./data/cotacoes.db")
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS cotacoes (
+    	id INTEGER PRIMARY KEY AUTOINCREMENT,
+    	bid TEXT NOT NULL,
+    	created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+		)
+	`)
+	if err != nil {
+		panic(err)
+	}
 	http.HandleFunc("/cotacao", BuscaCotacao)
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
@@ -79,6 +100,20 @@ func BuscaCotacao(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Printf("Erro ao converter a resposta: %v", err)
 		writeErrorResponse(w, http.StatusInternalServerError, "Erro ao ler a resposta")
+		return
+	}
+
+	ctxDB, cancelDB := context.WithTimeout(context.Background(), 10*time.Millisecond)
+	defer cancelDB()
+	_, err = db.ExecContext(ctxDB, "INSERT INTO cotacoes (bid) VALUES (?)", data.Cotacao.Bid)
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			log.Printf("Timeout ao salvar no banco de dados: %v", err)
+			writeErrorResponse(w, http.StatusGatewayTimeout, "Requisição demorou demais")
+			return
+		}
+		log.Printf("Erro ao salvar a resposta no banco de dados: %v", err)
+		writeErrorResponse(w, http.StatusInternalServerError, "Erro ao salvar a resposta")
 		return
 	}
 
