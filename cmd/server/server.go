@@ -109,7 +109,7 @@ func BuscaCotacao(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		if errors.Is(err, context.DeadlineExceeded) {
 			log.Printf("Timeout ao salvar no banco de dados: %v", err)
-			writeErrorResponse(w, http.StatusGatewayTimeout, "Requisição demorou demais")
+			writeErrorResponse(w, http.StatusInternalServerError, "Requisição demorou demais")
 			return
 		}
 		log.Printf("Erro ao salvar a resposta no banco de dados: %v", err)
