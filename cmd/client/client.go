@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -34,6 +35,11 @@ func main() {
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode != http.StatusOK {
+		log.Printf("API respondeu com status %v", resp.StatusCode)
+		return
+	}
+
 	var data CotacaoResponse
 	err = json.NewDecoder(resp.Body).Decode(&data)
 	if err != nil {
@@ -41,5 +47,16 @@ func main() {
 		return
 	}
 
-	fmt.Printf("BID: %v\n", data.Bid)
+	file, err := os.Create("./data/cotacao.txt")
+	if err != nil {
+		log.Printf("Erro ao criar arquivo: %v", err)
+		return
+	}
+	defer file.Close()
+	_, err = file.WriteString(fmt.Sprintf("Dólar: %v", data.Bid))
+	if err != nil {
+		log.Printf("Erro ao escrever no arquivo: %v", err)
+		return
+	}
+	fmt.Printf("Dólar: %v\n", data.Bid)
 }
